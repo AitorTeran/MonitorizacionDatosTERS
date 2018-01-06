@@ -8,7 +8,7 @@
 
 
 //DEFINICIONES E INICIALIZACION DE VARIABLES GLOBALES.
-const int pinSD = 10;   //Pin de comunicacion SPI para la tarjeta SD.
+const int pinSD = 10;   //Pin de comunicacion SPI (CS) para la tarjeta SD.
 File datos;             //Archivo que contendra los datos y que se incluira en la SD.
 
 // Conectar pins: CLK -> 13 // SDO -> 12 // SDI -> 11
@@ -16,14 +16,14 @@ Adafruit_MAX31865 max1 = Adafruit_MAX31865(9);  // CS -> 9
 Adafruit_MAX31865 max2 = Adafruit_MAX31865(8); // CS -> 8
 float temp1;
 float temp2;
-#define RREF 430.0      //Valor de la resistencia en el amplificador.
+#define RREF 430.0        //Valor de la resistencia en el amplificador.
 
-RTC_DS1307 rtc;         //Esta clase sirve para poder trabajar con el modulo de la SD.
-char timeNow[10];       //Buffer donde se guardarán los valores de tiempo actuales.
-char dateNow[10];       //Buffer donde se guardarán los valores de fecha actuales.
+RTC_DS1307 rtc;           //Esta clase sirve para poder trabajar con el modulo de la SD.
+char timeNow[10];         //Buffer donde se guardarán los valores de tiempo actuales.
+char dateNow[10];         //Buffer donde se guardarán los valores de fecha actuales.
 
 const int pinRes = A0;  
-const float RES = 3.52;      //Resistencia de disipacion de energia, equivalente.
+const float RES = 3.52;   //Resistencia de disipacion de energia, equivalente.
 float resAnalog;
 float resVoltage;
 float resCurrent;
@@ -50,7 +50,7 @@ void Inicializar(){
   if (! rtc.isrunning()) {  //Comprobamos si está encendido el reloj de tiempo real.
     Serial.println("ERROR: RELOJ NO ENCENDIDO.");
   }
-  else Serial.println("Reloj encontrado, contando...");
+  else Serial.println("Reloj encontrado, contando..."); //FIN DE COMENTARIO
 
   max1.begin(MAX31865_2WIRE);  // set to 2WIRE or 4WIRE as necessary
   max2.begin(MAX31865_2WIRE);  // set to 2WIRE or 4WIRE as necessary
@@ -151,6 +151,8 @@ float GetTemp(int sensorselect)
       return max2.temperature(100, RREF);
       break;
 
+    //Si se pretenden incluir mas sensores de temperatura podrán ser leídos en este switch.
+    
     default:
       break;
   }
@@ -158,11 +160,11 @@ float GetTemp(int sensorselect)
 
 void ReadRes()
 {
-  resAnalog = analogRead(pinRes);                           //Analog read at resistor.
-  resVoltage = map (resAnalog, 0, 1024, 0, 5000);           //Voltage at resistor.  
+  resAnalog = analogRead(pinRes);                     //Analog read at resistor.
+  resVoltage = map (resAnalog, 0, 1024, 0, 5000);     //Voltage at resistor.  
   resVoltage /= 1000;
-  resCurrent = resVoltage / RES;                   //Current flowing through resistor.
-  resPower = resVoltage * resVoltage / RES;     //Power disipated by resistor / generated in peltier.  
+  resCurrent = resVoltage / RES;                      //Current flowing through resistor.
+  resPower = resVoltage * resVoltage / RES;           //Power disipated by resistor / generated in peltier.  
 }
 //FIN DE FUNCIONES
 
