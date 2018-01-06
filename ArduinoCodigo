@@ -1,0 +1,194 @@
+//INICIO DE LIBRERÍAS
+#include <RTClib.h>             //Gestiona la placa de la tarjeta SD.
+#include <Time.h>               //Gestiona funciones de tiempo.
+#include <SD.h>                 //Gestiona el archivo .txt
+#include <Adafruit_MAX31865.h>  //Gestiona la comunicacion con el sensor.
+//La librería SPI.h esta incluida en Adaftuit_MAX31865.h.
+//FIN DE LIBRERÍAS
+
+
+//DEFINICIONES E INICIALIZACION DE VARIABLES GLOBALES.
+const int pinSD = 10;   //Pin de comunicacion SPI para la tarjeta SD.
+File datos;             //Archivo que contendra los datos y que se incluira en la SD.
+
+// Conectar pins: CLK -> 13 // SDO -> 12 // SDI -> 11
+Adafruit_MAX31865 max1 = Adafruit_MAX31865(9);  // CS -> 9
+Adafruit_MAX31865 max2 = Adafruit_MAX31865(8); // CS -> 8
+float temp1;
+float temp2;
+#define RREF 430.0      //Valor de la resistencia en el amplificador.
+
+RTC_DS1307 rtc;         //Esta clase sirve para poder trabajar con el modulo de la SD.
+char timeNow[10];       //Buffer donde se guardarán los valores de tiempo actuales.
+char dateNow[10];       //Buffer donde se guardarán los valores de fecha actuales.
+
+const int pinRes = A0;  
+const float RES = 3.52;      //Resistencia de disipacion de energia, equivalente.
+float resAnalog;
+float resVoltage;
+float resCurrent;
+float resPower;
+//FIN DE DEFINICIONES
+
+
+//FUNCIONES
+void Inicializar(){
+  Serial.begin(115200);   //Inicializar el monitor serie.
+  Serial.println("Serial inicializado.");
+  
+  rtc.begin();          //Inicializar RTC.
+  Serial.println("RTC inicializado.");
+
+  if (!SD.begin(pinSD)){  //Inicializamos la tarjeta y reportamos error en caso de haberlo.
+    Serial.println("ERROR: TARJETA SD NO ENCONTRADA.");
+  }
+  else Serial.println("Tarjeta SD encontrada, rellenando datos...");
+  
+  //Las lineas a continuación son para ajustar el reloj al tiempo real. 
+  //COMENTAR LAS LINEAS A CONTINUACION CUANDO  SE PRETENDA HACER FUNCIONAR SIN CONECTAR AL ORDENADOR.
+  rtc.adjust(DateTime(__DATE__,__TIME__));  //Parametros para inicializar el tiempo y fecha.
+  if (! rtc.isrunning()) {  //Comprobamos si está encendido el reloj de tiempo real.
+    Serial.println("ERROR: RELOJ NO ENCENDIDO.");
+  }
+  else Serial.println("Reloj encontrado, contando...");
+
+  max1.begin(MAX31865_2WIRE);  // set to 2WIRE or 4WIRE as necessary
+  max2.begin(MAX31865_2WIRE);  // set to 2WIRE or 4WIRE as necessary
+  Serial.println("Sensores inicializados.");
+}
+
+
+void PinSetup(){
+  pinMode(pinSD, OUTPUT);
+  pinMode(pinRes, INPUT);
+}
+
+
+void TxtInit(){
+  DateTime now = rtc.now();
+  sprintf(dateNow, "%02d/%02d/%02d", now.day(), now.month(), now.year());     //Actualizo fecha en el buffer
+  //Escribo la fecha actual en el archivo de datos.
+  datos = SD.open("datos.txt", FILE_WRITE);
+  datos.print("\n\n\n");  //Dejo espacio al principio.
+  datos.print("INIT DATE:  ");
+  datos.println(dateNow);
+  datos.println();
+  datos.println("\n HORA\t\tT1[oC]\t\tT2[oC]\t\tP[W]");
+  datos.close();
+}
+
+
+void SerialInit(){
+  DateTime now = rtc.now();
+  sprintf(dateNow, "%02d/%02d/%02d", now.day(), now.month(), now.year());     //Actualizo fecha en el buffer
+  //Escribo la fecha actual en el archivo de datos.
+  Serial.println("\n");  //Dejo espacio al principio.
+  Serial.print("INIT DATE:  ");
+  Serial.println(dateNow);
+  Serial.println("\n HORA\t\tT1[oC]\t\tT2[oC]\t\tP[W]");
+}
+
+
+void TxtWriteTime(){
+  datos.println();
+  DateTime now = rtc.now(); //Adquisición de los datos de tiempo actual.
+  sprintf(timeNow, "%02d:%02d:%02d", now.hour(), now.minute(), now.second()); //Actualizo hora en el buffer.
+  datos.print(timeNow);
+  
+}
+
+void TxtWriteTemp(){
+  //temp1 = GetTemp(1);
+  //temp2 = GetTemp(2);
+  datos.print("\t");
+  datos.print(temp1);
+  datos.print("\t\t");
+  datos.print(temp2);
+}
+
+void TxtWriteRes()
+{
+  datos.print("\t\t");
+  datos.print(resPower);
+}
+
+
+void SerialWriteTime(){
+  Serial.println();
+  DateTime now = rtc.now(); //Adquisición de los datos de tiempo actual.
+  sprintf(timeNow, "%02d:%02d:%02d", now.hour(), now.minute(), now.second()); //Actualizo hora en el buffer.
+  Serial.print(timeNow);
+}
+
+void SerialWriteTemp()
+{
+  Serial.print("\t");
+  Serial.print(temp1);
+  Serial.print("\t\t");
+  Serial.print(temp2);
+}
+
+void SerialWriteRes()
+{
+  Serial.print("\t\t");
+  /*Serial.print(resVoltage);
+  Serial.print("  ");
+  Serial.print(resCurrent);
+  Serial.print("  ");*/
+  Serial.print(resPower);
+}
+
+
+float GetTemp(int sensorselect)
+{
+  switch (sensorselect)
+  {
+    case 1:
+       return max1.temperature(100, RREF);
+       break;
+
+     case 2:
+      return max2.temperature(100, RREF);
+      break;
+
+    default:
+      break;
+  }
+}
+
+void ReadRes()
+{
+  resAnalog = analogRead(pinRes);                           //Analog read at resistor.
+  resVoltage = map (resAnalog, 0, 1024, 0, 5000);           //Voltage at resistor.  
+  resVoltage /= 1000;
+  resCurrent = resVoltage / RES;                   //Current flowing through resistor.
+  resPower = resVoltage * resVoltage / RES;     //Power disipated by resistor / generated in peltier.  
+}
+//FIN DE FUNCIONES
+
+
+void setup()
+{
+  Inicializar();
+  PinSetup();
+  TxtInit();
+  SerialInit();
+}
+
+
+void loop()
+{
+  //Abro y cierro el archivo de texto en cada iteración.
+  datos = SD.open("datos.txt", FILE_WRITE);
+  TxtWriteTime();
+  SerialWriteTime();
+  temp1 = GetTemp(1);
+  temp2 = GetTemp(2);
+  TxtWriteTemp();
+  SerialWriteTemp();
+  ReadRes();
+  TxtWriteRes();
+  SerialWriteRes();
+  datos.close();
+  delay(1000);
+}
